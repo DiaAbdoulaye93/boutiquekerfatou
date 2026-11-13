@@ -1,0 +1,27 @@
+{
+  "_note": "Texte attendu de chaque vocal (wav/<langue>/<numéro>.wav). Le wolof suppose que les phrases ont été lues telles qu'écrites : corriger ici toute phrase dite autrement.",
+  "wo": {
+    "01": "Ñaata la Modou Diop am bor ci man ?",
+    "02": "Kan moo am bor bu gëna rëy ci man ?",
+    "03": "Lan moo gëna jaay ci weer wii ?",
+    "04": "Ñaata xaalis laa def tey ?",
+    "05": "Wone ma factures yi ma def démb.",
+    "06": "Lan laa wara jëndaat ?",
+    "07": "Ñaata kilo ceeb laa jaay ci ayu-bés bii ?",
+    "08": "Facture mille deux cent quarante-trois, lan la ci biir ?",
+    "09": "Ndèye Mbaye, ñaata la jënd ci weer wi ?",
+    "10": "Vente bi ce mois-ci, ñaata la ?"
+  },
+  "fr": {
+    "01": "Combien me doit Modou Diop ?",
+    "02": "Quel est le produit le plus vendu ce mois-ci ?",
+    "03": "Montre-moi les factures à crédit de la semaine.",
+    "04": "Que contient la facture mille deux cent quarante-trois ?",
+    "05": "Combien de kilos de riz j'ai vendu cette semaine ?"
+  },
+  "en": {
+    "01": "Who owes me the most money?",
+    "02": "What should I buy again?",
+    "03": "How much did Ndèye Mbaye spend this month?"
+  }
+}

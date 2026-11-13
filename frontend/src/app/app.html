@@ -25,7 +25,10 @@
   @if (!messages().length) {
     <section class="welcome">
       <h1>Posez votre question</h1>
-      <p class="muted">En français, en wolof, en anglais ou en pulaar.</p>
+      <p class="muted">
+        Appuyez sur le micro et parlez en wolof, en français ou en anglais. Vous pouvez aussi
+        écrire, y compris en pulaar.
+      </p>
       <div class="suggestions">
         @for (s of suggestions; track s) {
           <button type="button" class="chip" (click)="send(s)">{{ s }}</button>
@@ -34,15 +37,35 @@
     </section>
   }
 
-  @for (m of messages(); track $index) {
+  @for (m of messages(); track m.id) {
     @if (m.role === 'user') {
-      <p class="bubble bubble-user">{{ m.text }}</p>
+      <p class="bubble bubble-user">
+        @if (m.spoken) {
+          <span class="heard">Vocal · entendu</span>
+        }
+        {{ m.text }}
+      </p>
     } @else if (m.reply; as r) {
       <section class="answer">
-        <p class="bubble bubble-assistant">
+        <div class="bubble bubble-assistant">
           <span class="lang">{{ languages[r.language] }}</span>
-          {{ m.text }}
-        </p>
+          <p>{{ m.text }}</p>
+          <button
+            type="button"
+            class="replay"
+            [class.is-playing]="playing() === m.id"
+            [disabled]="loadingVoice() === m.id"
+            (click)="listen(m)"
+          >
+            {{
+              loadingVoice() === m.id
+                ? 'Voix en préparation…'
+                : playing() === m.id
+                  ? 'Lecture…'
+                  : 'Écouter'
+            }}
+          </button>
+        </div>
         @for (c of r.cards; track $index) {
           <app-result-card [card]="c" />
         }
@@ -51,10 +74,15 @@
     }
   }
 
-  @if (pending()) {
-    <p class="bubble bubble-assistant thinking" aria-live="polite">
+  @if (status() === 'transcribing' || status() === 'thinking') {
+    <p
+      class="bubble thinking"
+      [class.bubble-user]="status() === 'transcribing'"
+      [class.bubble-assistant]="status() === 'thinking'"
+      aria-live="polite"
+    >
       <span class="dot"></span><span class="dot"></span><span class="dot"></span>
-      <span class="sr-only">L'assistant cherche la réponse</span>
+      <span class="thinking-label">{{ statusLabel() }}</span>
     </p>
   }
   @if (error(); as e) {
@@ -63,21 +91,76 @@
   <div #bottom></div>
 </main>
 
-<form class="composer" (submit)="$event.preventDefault(); send()">
-  <label class="sr-only" for="question">Votre question</label>
-  <input
-    id="question"
-    class="composer-input"
-    autocomplete="off"
-    placeholder="Écrivez votre question…"
-    [ngModel]="draft()"
-    (ngModelChange)="draft.set($event)"
-    name="question"
-    [disabled]="pending()"
-  />
-  <button type="submit" class="send" [disabled]="pending() || !draft().trim()" aria-label="Envoyer">
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M3 20.5 21 12 3 3.5v6.6L15 12 3 13.9z" />
-    </svg>
-  </button>
-</form>
+<div class="dock">
+  @if (micSupported) {
+    <div class="lang-switch" role="radiogroup" aria-label="Langue du vocal">
+      @for (l of spoken; track l.code) {
+        <button
+          type="button"
+          role="radio"
+          class="lang-option"
+          [attr.aria-checked]="language() === l.code"
+          [class.is-active]="language() === l.code"
+          [disabled]="busy()"
+          (click)="setLanguage(l.code)"
+        >
+          {{ l.label }}
+        </button>
+      }
+    </div>
+  }
+
+  <form class="composer" (submit)="$event.preventDefault(); send()">
+    @if (status() === 'recording') {
+      <p class="recording" aria-live="polite">
+        <span class="rec-dot"></span> {{ statusLabel() }} {{ seconds() }} s
+      </p>
+    } @else {
+      <label class="sr-only" for="question">Votre question</label>
+      <input
+        id="question"
+        class="composer-input"
+        autocomplete="off"
+        placeholder="Écrivez ou appuyez sur le micro…"
+        [ngModel]="draft()"
+        (ngModelChange)="draft.set($event)"
+        name="question"
+        [disabled]="busy()"
+      />
+    }
+
+    @if (draft().trim() || !micSupported) {
+      <button
+        type="submit"
+        class="send"
+        [disabled]="busy() || !draft().trim()"
+        aria-label="Envoyer"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M3 20.5 21 12 3 3.5v6.6L15 12 3 13.9z" />
+        </svg>
+      </button>
+    } @else {
+      <button
+        type="button"
+        class="send mic"
+        [class.is-recording]="status() === 'recording'"
+        [disabled]="status() === 'transcribing' || status() === 'thinking'"
+        [attr.aria-label]="status() === 'recording' ? 'Arrêter et envoyer' : 'Parler'"
+        (click)="toggleMic()"
+      >
+        @if (status() === 'recording') {
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="6" y="6" width="12" height="12" rx="2" />
+          </svg>
+        } @else {
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.9V21h2v-2.1a7 7 0 0 0 6-6.9h-2Z"
+            />
+          </svg>
+        }
+      </button>
+    }
+  </form>
+</div>

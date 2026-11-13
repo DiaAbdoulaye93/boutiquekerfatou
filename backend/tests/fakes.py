@@ -6,6 +6,7 @@ from typing import Any
 
 from app.assistant.llm_client import LlmError, LlmUsage
 from app.config import Settings
+from app.voice.client import Speech, Transcript, VoiceError
 
 
 def tool_use(name: str, args: dict[str, Any], call_id: str = "call_1") -> SimpleNamespace:
@@ -41,6 +42,28 @@ class FakeLlmClient:
             raise step
         self.usage.append(LlmUsage(kwargs["step"], self.model, 1000, 0, 800, 120, 900))
         return step
+
+
+class FakeVoiceClient:
+    """Hears `heard`, speaks a short WAV; either step can be set to fail."""
+
+    def __init__(self, heard: str = "Kan moo am bor bu gëna rëy ci man ?") -> None:
+        self.heard = heard
+        self.fail_transcribe = False
+        self.fail_synthesize = False
+        self.calls: list[tuple[str, ...]] = []
+
+    def transcribe(self, audio: bytes, content_type: str, language: str) -> Transcript:
+        self.calls.append(("transcribe", content_type, language))
+        if self.fail_transcribe:
+            raise VoiceError("la transcription du vocal a échoué, réessayez")
+        return Transcript(text=self.heard, provider="fake", duration_ms=300)
+
+    def synthesize(self, text: str, language: str) -> Speech:
+        self.calls.append(("synthesize", text, language))
+        if self.fail_synthesize:
+            raise VoiceError("la synthèse vocale a échoué")
+        return Speech(audio=b"RIFF....WAVE", content_type="audio/wav", duration_ms=500)
 
 
 def factory(script: list[Step]) -> Callable[[Settings], FakeLlmClient]:

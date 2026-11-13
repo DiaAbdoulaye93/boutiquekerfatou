@@ -34,6 +34,19 @@ class Settings(BaseSettings):
     # Models sent with server-side refusal fallback (`fallbacks: "default"`).
     server_fallback_models: frozenset[str] = frozenset({"claude-opus-5-5", "claude-sonnet-5-5"})
 
+    # Voice through Speko (bench/ results, 13/11/2026). Listening: ElevenLabs Scribe in
+    # every language (Wolof 10/11 key words, French 3 % word errors, about 2 s).
+    # Speaking: Gemini TTS; Flash-Lite answers in 1.5 s against 2 to 5 s for Flash.
+    speko_api_key: SecretStr | None = None
+    stt_providers: dict[str, list[str]] = {
+        "wo": ["elevenlabs"],
+        "fr": ["elevenlabs"],
+        "en": ["elevenlabs"],
+    }
+    tts_provider: str = "google"  # Speko's name for Gemini TTS
+    tts_model: str | None = "gemini-3.8-flash-lite-tts"
+    max_audio_bytes: int = 5_000_000  # about 5 minutes of Opus: far above one question
+
     database_url: str = "postgresql+psycopg://postgres@localhost:5432/boutique_vocale"
     test_database_url: str = "postgresql+psycopg://postgres@localhost:5432/boutique_vocale_test"
 
@@ -54,7 +67,7 @@ class Settings(BaseSettings):
 
     log_level: str = "INFO"
 
-    @field_validator("anthropic_api_key", "app_password", mode="before")
+    @field_validator("anthropic_api_key", "app_password", "speko_api_key", mode="before")
     @classmethod
     def empty_is_unset(cls, value: object) -> object:
         """`APP_PASSWORD=` (empty, as in .env.example) means no password, not an empty one."""

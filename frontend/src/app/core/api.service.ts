@@ -2,7 +2,7 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
-import { AskIn, AskOut, Shop } from './models';
+import { AskIn, AskOut, Language, Shop, SpokenLanguage, TranscribeOut } from './models';
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
@@ -15,6 +15,23 @@ export class ApiService {
   ask(body: AskIn): Observable<AskOut> {
     return this.http.post<AskOut>('/api/ask', body);
   }
+
+  transcribe(audio: Blob, language: SpokenLanguage): Observable<TranscribeOut> {
+    const extension = audio.type.includes('mp4')
+      ? 'm4a'
+      : audio.type.includes('ogg')
+        ? 'ogg'
+        : 'webm';
+    const form = new FormData();
+    form.append('audio', audio, `question.${extension}`);
+    form.append('language', language);
+    return this.http.post<TranscribeOut>('/api/transcribe', form);
+  }
+
+  /** The text read aloud, as an audio file. */
+  speak(text: string, language: Language): Observable<Blob> {
+    return this.http.post('/api/speak', { text, language }, { responseType: 'blob' });
+  }
 }
 
 /** French message for the user from an HTTP error. */
@@ -25,7 +42,8 @@ export function errorMessage(error: unknown): string {
     }
     const detail = (error.error as { detail?: unknown } | null)?.detail;
     if (typeof detail === 'string') {
-      return detail.charAt(0).toUpperCase() + detail.slice(1) + '.';
+      const sentence = detail.charAt(0).toUpperCase() + detail.slice(1);
+      return /[.!?]$/.test(sentence) ? sentence : sentence + '.';
     }
     return `Erreur du serveur (${error.status}).`;
   }

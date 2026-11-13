@@ -36,6 +36,17 @@ class AskOut(BaseModel):
     cost_usd: float | None
 
 
+class TranscribeOut(BaseModel):
+    text: str  # what was heard
+    provider: str
+    duration_ms: int
+
+
+class SpeakIn(BaseModel):
+    text: str = Field(min_length=1, max_length=1500)
+    language: Literal["fr", "wo", "en", "ff"]
+
+
 class ShopOut(BaseModel):
     name: str
     fictional: Literal[True] = True

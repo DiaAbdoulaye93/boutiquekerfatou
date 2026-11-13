@@ -9,6 +9,7 @@ dependencies = [
     "psycopg[binary]>=3.3.6",
     "pydantic-settings>=2.16.1",
     "python-multipart>=0.0.32",
+    "spekoai>=0.2.4",
     "sqlmodel>=0.0.48",
     "uvicorn[standard]>=0.54.0",
 ]

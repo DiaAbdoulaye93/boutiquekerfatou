@@ -21,6 +21,20 @@ réponse courte + langue ◄── outil « repondre »      cartes de résultat
 - La réponse finale est un appel à l'outil `repondre(texte, langue)`. La langue est donc structurée, prête pour la synthèse vocale.
 - Les noms prononcés sont rapprochés du catalogue (accents, fautes de transcription, mots wolof comme *ceeb*, *suukar* ou *diwlin*).
 
+## La voix
+
+Un vocal passe par trois appels, pour que l'écran avance à chaque étape :
+
+| Étape | Route | Moteur (via [Speko](https://speko.ai)) | Temps typique |
+|---|---|---|---|
+| Écoute | `POST /api/transcribe` | ElevenLabs Scribe, dans les trois langues | ~1,5 s |
+| Réponse | `POST /api/ask` | Claude Opus 5.5 et les outils | ~5 à 7 s |
+| Voix | `POST /api/speak` | Gemini 3.8 Flash-Lite TTS | ~2 à 4 s |
+
+Le wolof, le français et l'anglais se parlent au micro ; la langue est choisie dans l'app avant de parler (Speko exige la langue pour transcrire). Le pulaar reste disponible à l'écrit.
+
+Aucun moteur de synthèse n'accepte le code langue `wo` : le texte wolof est envoyé avec le code `fr`, et le modèle le lit tel qu'il est écrit. Ces choix viennent du banc d'essai de `bench/` (vocaux réels, taux d'erreur, compréhension de bout en bout, latence).
+
 ## Lancer en local
 
 Prérequis : Python 3.12 avec [uv](https://docs.astral.sh/uv/), Node 24, PostgreSQL 16.
@@ -51,8 +65,9 @@ cd frontend && npm run lint && npm run build
 ## Déploiement : Render + Neon
 
 1. **Neon** : créer un projet PostgreSQL (région Frankfurt, comme Render) et copier son URL de connexion *pooled* (`postgresql://…@ep-…-pooler.eu-central-1.aws.neon.tech/neondb?sslmode=require`). Les requêtes préparées sont désactivées côté app, le pooler de Neon fonctionne donc tel quel.
-2. **Render** : *New > Blueprint*, choisir ce dépôt. `render.yaml` crée le service web (image Docker, contrôle `/health`) et demande trois secrets :
+2. **Render** : *New > Blueprint*, choisir ce dépôt. `render.yaml` crée le service web (image Docker, contrôle `/health`) et demande quatre secrets :
    - `ANTHROPIC_API_KEY`
+   - `SPEKO_API_KEY` : transcription et voix
    - `DATABASE_URL` : l'URL de Neon
    - `APP_PASSWORD` : obligatoire sur une URL publique, pour que personne ne consomme le budget Anthropic
 3. Ensuite, chaque push sur `main` redéploie. La CI GitHub (`.github/workflows/ci.yml`) lance le lint et les tests.

@@ -3,6 +3,15 @@
 .env.*
 !.env.example
 
+# Voice bench: the recordings are the author's own voice, kept out of the repository
+bench/wo/
+bench/fr/
+bench/en/
+bench/ff/
+bench/wav/
+bench/results/
+bench/tts/
+
 # Python
 __pycache__/
 *.py[cod]

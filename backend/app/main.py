@@ -9,7 +9,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from sqlalchemy import Engine
 
-from app.api.ask import LlmClientFactory
+from app.api.ask import LlmClientFactory, VoiceClientFactory
 from app.api.ask import router as ask_router
 from app.assistant.llm_client import AnthropicLlmClient
 from app.auth import add_basic_auth
@@ -18,6 +18,7 @@ from app.db import get_engine, init_db
 from app.schemas import HealthOut
 from app.seed.generate import is_empty, seed_database, slide_to_today
 from app.spa import INDEX, mount_spa
+from app.voice.client import SpekoVoiceClient
 
 APP_VERSION = version("boutique-vocale")
 logger = logging.getLogger(__name__)
@@ -27,8 +28,10 @@ def create_app(
     engine: Engine | None = None,
     llm_client_factory: LlmClientFactory | None = None,
     static_dir: Path | None = None,
+    voice_client_factory: VoiceClientFactory | None = None,
 ) -> FastAPI:
-    """Build the app; tests pass their own engine, a fake LLM client and a static folder."""
+    """Build the app; tests pass their own engine, fake Claude and voice clients and a
+    static folder."""
     settings = get_settings()
     logging.basicConfig(level=settings.log_level, format="%(levelname)s %(name)s: %(message)s")
 
@@ -46,6 +49,7 @@ def create_app(
     app = FastAPI(title="Boutique vocale", version=APP_VERSION, lifespan=lifespan)
     app.state.engine = engine or get_engine()
     app.state.llm_client_factory = llm_client_factory or AnthropicLlmClient
+    app.state.voice_client_factory = voice_client_factory or SpekoVoiceClient
     app.include_router(ask_router)
     if settings.app_password is not None:
         add_basic_auth(app, settings.app_username, settings.app_password.get_secret_value())

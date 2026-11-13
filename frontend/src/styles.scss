@@ -194,7 +194,7 @@ p {
   width: 100%;
   max-width: var(--content-max-width);
   margin: 0 auto;
-  padding: var(--space-5) var(--space-4) 120px;
+  padding: var(--space-5) var(--space-4) 170px; // room for the dock (language + composer)
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
@@ -265,7 +265,19 @@ p {
 
 .thinking {
   display: flex;
+  align-items: center;
   gap: 6px;
+  .thinking-label {
+    margin-left: 6px;
+    font-size: 14px;
+    color: var(--color-ink-muted);
+  }
+  &.bubble-user .dot {
+    background: #fff;
+  }
+  &.bubble-user .thinking-label {
+    color: #fff;
+  }
   .dot {
     width: 8px;
     height: 8px;
@@ -400,18 +412,115 @@ p {
 
 // --- Composer ---
 
-.composer {
+.dock {
   position: fixed;
   left: 0;
   right: 0;
   bottom: 0;
   z-index: 2;
-  display: flex;
-  gap: var(--space-2);
-  padding: var(--space-3) var(--space-4) calc(var(--space-3) + env(safe-area-inset-bottom));
-  background: linear-gradient(to top, var(--color-background) 70%, transparent);
   max-width: var(--content-max-width);
   margin: 0 auto;
+  padding: var(--space-3) var(--space-4) calc(var(--space-3) + env(safe-area-inset-bottom));
+  background: linear-gradient(to top, var(--color-background) 75%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.lang-switch {
+  align-self: center;
+  display: inline-flex;
+  padding: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+}
+
+.lang-option {
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-ink-muted);
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  &.is-active {
+    background: var(--color-primary);
+    color: #fff;
+  }
+  &:disabled {
+    cursor: not-allowed;
+  }
+}
+
+.composer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.recording {
+  flex: 1;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 18px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+.rec-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  animation: blink 1s infinite ease-in-out;
+}
+
+.mic.is-recording {
+  background: var(--color-accent);
+  animation: pulse 1.4s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(194, 65, 12, 0.45);
+  }
+  100% {
+    box-shadow: 0 0 0 16px rgba(194, 65, 12, 0);
+  }
+}
+
+.heard {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.8;
+  margin-bottom: 2px;
+}
+
+.replay {
+  margin-top: 8px;
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface-alt);
+  color: var(--color-primary-strong);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: var(--radius-pill);
+  padding: 4px 12px;
+  cursor: pointer;
+  &.is-playing {
+    background: var(--color-primary-soft);
+    border-color: var(--color-primary);
+  }
 }
 
 .composer-input {

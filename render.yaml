@@ -13,6 +13,9 @@ services:
       # Secrets: asked once in the Render dashboard, never stored in the repository.
       - key: ANTHROPIC_API_KEY
         sync: false
+      # Speko: transcription (ElevenLabs Scribe) and voice (Gemini TTS).
+      - key: SPEKO_API_KEY
+        sync: false
       - key: DATABASE_URL
         sync: false
       - key: APP_PASSWORD

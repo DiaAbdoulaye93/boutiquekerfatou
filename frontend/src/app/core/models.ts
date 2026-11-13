@@ -34,6 +34,14 @@ export interface AskOut {
   cost_usd: number | null;
 }
 
+export type SpokenLanguage = 'fr' | 'wo' | 'en';
+
+export interface TranscribeOut {
+  text: string;
+  provider: string;
+  duration_ms: number;
+}
+
 export interface Shop {
   name: string;
   fictional: true;
