@@ -1,0 +1,83 @@
+<header class="topbar">
+  <div class="brand">
+    <span class="logo" aria-hidden="true">
+      <svg viewBox="0 0 24 24">
+        <path
+          d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.9V21h2v-2.1a7 7 0 0 0 6-6.9h-2Z"
+        />
+      </svg>
+    </span>
+    <div class="brand-text">
+      <span class="brand-name">{{ shop()?.name ?? 'Boutique vocale' }}</span>
+      @if (shop(); as s) {
+        <span class="brand-sub">{{ s.receipts }} factures · {{ period(s) }}</span>
+      }
+    </div>
+  </div>
+  @if (messages().length) {
+    <button type="button" class="btn btn-text" (click)="reset()">Effacer</button>
+  }
+</header>
+
+<p class="fiction-banner" role="note">Démo : toutes les données de cette boutique sont fictives.</p>
+
+<main class="chat">
+  @if (!messages().length) {
+    <section class="welcome">
+      <h1>Posez votre question</h1>
+      <p class="muted">En français, en wolof, en anglais ou en pulaar.</p>
+      <div class="suggestions">
+        @for (s of suggestions; track s) {
+          <button type="button" class="chip" (click)="send(s)">{{ s }}</button>
+        }
+      </div>
+    </section>
+  }
+
+  @for (m of messages(); track $index) {
+    @if (m.role === 'user') {
+      <p class="bubble bubble-user">{{ m.text }}</p>
+    } @else if (m.reply; as r) {
+      <section class="answer">
+        <p class="bubble bubble-assistant">
+          <span class="lang">{{ languages[r.language] }}</span>
+          {{ m.text }}
+        </p>
+        @for (c of r.cards; track $index) {
+          <app-result-card [card]="c" />
+        }
+        <p class="meta">{{ meta(r) }}</p>
+      </section>
+    }
+  }
+
+  @if (pending()) {
+    <p class="bubble bubble-assistant thinking" aria-live="polite">
+      <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+      <span class="sr-only">L'assistant cherche la réponse</span>
+    </p>
+  }
+  @if (error(); as e) {
+    <p class="error" role="alert">{{ e }}</p>
+  }
+  <div #bottom></div>
+</main>
+
+<form class="composer" (submit)="$event.preventDefault(); send()">
+  <label class="sr-only" for="question">Votre question</label>
+  <input
+    id="question"
+    class="composer-input"
+    autocomplete="off"
+    placeholder="Écrivez votre question…"
+    [ngModel]="draft()"
+    (ngModelChange)="draft.set($event)"
+    name="question"
+    [disabled]="pending()"
+  />
+  <button type="submit" class="send" [disabled]="pending() || !draft().trim()" aria-label="Envoyer">
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M3 20.5 21 12 3 3.5v6.6L15 12 3 13.9z" />
+    </svg>
+  </button>
+</form>

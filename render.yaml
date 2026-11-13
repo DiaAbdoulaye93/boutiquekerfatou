@@ -1,0 +1,27 @@
+# Render Blueprint: one web service built from the Dockerfile, redeployed on every push
+# to main. The PostgreSQL database lives on Railway (public connection URL).
+services:
+  - type: web
+    name: boutique-vocale
+    runtime: docker
+    plan: free
+    region: frankfurt
+    branch: main
+    autoDeploy: true
+    healthCheckPath: /health
+    envVars:
+      # Secrets: asked once in the Render dashboard, never stored in the repository.
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: APP_PASSWORD
+        sync: false
+      - key: APP_USERNAME
+        value: boutique
+      - key: ASSISTANT_MODEL
+        value: claude-opus-5-5
+      - key: ASSISTANT_EFFORT
+        value: low
+      - key: SHOP_NAME
+        value: Boutique Keur Fatou
