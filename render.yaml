@@ -1,5 +1,5 @@
 # Render Blueprint: one web service built from the Dockerfile, redeployed on every push
-# to main. The PostgreSQL database lives on Railway (public connection URL).
+# to main. The PostgreSQL database lives on Neon (pooled connection URL).
 services:
   - type: web
     name: boutique-vocale

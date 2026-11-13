@@ -48,12 +48,12 @@ cd backend && uv run pytest -q          # Claude est remplacé par un faux clien
 cd frontend && npm run lint && npm run build
 ```
 
-## Déploiement : Render + Railway
+## Déploiement : Render + Neon
 
-1. **Railway** : créer une base PostgreSQL et copier son URL de connexion **publique** (`postgresql://…@….proxy.rlwy.net:PORT/railway`). Render ne voit pas le réseau privé de Railway.
+1. **Neon** : créer un projet PostgreSQL (région Frankfurt, comme Render) et copier son URL de connexion *pooled* (`postgresql://…@ep-…-pooler.eu-central-1.aws.neon.tech/neondb?sslmode=require`). Les requêtes préparées sont désactivées côté app, le pooler de Neon fonctionne donc tel quel.
 2. **Render** : *New > Blueprint*, choisir ce dépôt. `render.yaml` crée le service web (image Docker, contrôle `/health`) et demande trois secrets :
    - `ANTHROPIC_API_KEY`
-   - `DATABASE_URL` : l'URL publique de Railway
+   - `DATABASE_URL` : l'URL de Neon
    - `APP_PASSWORD` : obligatoire sur une URL publique, pour que personne ne consomme le budget Anthropic
 3. Ensuite, chaque push sur `main` redéploie. La CI GitHub (`.github/workflows/ci.yml`) lance le lint et les tests.
 
