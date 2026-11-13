@@ -44,6 +44,10 @@ export function errorMessage(error: unknown): string {
       return 'Le serveur est injoignable. Vérifiez la connexion.';
     }
     const detail = (error.error as { detail?: unknown } | null)?.detail;
+    if (error.status === 422 && Array.isArray(detail)) {
+      // FastAPI validation error: the app and the server disagree on the request.
+      return "La requête n'a pas été acceptée par le serveur. Rechargez la page et réessayez.";
+    }
     if (typeof detail === 'string') {
       const sentence = detail.charAt(0).toUpperCase() + detail.slice(1);
       return /[.!?]$/.test(sentence) ? sentence : sentence + '.';

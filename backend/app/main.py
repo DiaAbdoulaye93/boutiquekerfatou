@@ -6,7 +6,9 @@ from contextlib import asynccontextmanager
 from importlib.metadata import version
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
+from fastapi.exception_handlers import request_validation_exception_handler
+from fastapi.exceptions import RequestValidationError
 from sqlalchemy import Engine
 
 from app.api.ask import LlmClientFactory, VoiceClientFactory
@@ -53,6 +55,16 @@ def create_app(
     app.include_router(ask_router)
     if settings.app_password is not None:
         add_basic_auth(app, settings.app_username, settings.app_password.get_secret_value())
+
+    @app.exception_handler(RequestValidationError)
+    async def log_validation_error(request: Request, exc: RequestValidationError) -> Response:
+        # A 422 from the PWA means the app and the API disagree: log which field.
+        fields = [
+            f"{'.'.join(str(p) for p in error.get('loc', ()))}: {error.get('msg')}"
+            for error in exc.errors()
+        ]
+        logger.warning("422 on %s %s: %s", request.method, request.url.path, "; ".join(fields))
+        return await request_validation_exception_handler(request, exc)
 
     @app.get("/health", response_model=HealthOut, tags=["health"])
     def health() -> HealthOut:
