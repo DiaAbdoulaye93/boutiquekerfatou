@@ -103,7 +103,10 @@ def transcribe(
     request: Request,
     settings: SettingsDep,
     audio: Annotated[UploadFile, File(description="recorded question (webm, ogg, mp4, wav)")],
-    language: Annotated[SpokenLanguage, Form(description="language the question is spoken in")],
+    language: Annotated[
+        SpokenLanguage | None,
+        Form(description="language spoken, if known; omitted, it is detected"),
+    ] = None,
 ) -> TranscribeOut:
     data = audio.file.read(settings.max_audio_bytes + 1)
     if len(data) > settings.max_audio_bytes:

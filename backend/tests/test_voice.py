@@ -47,6 +47,11 @@ def test_transcribe(client: TestClient, voice: FakeVoiceClient) -> None:
     assert voice.calls == [("transcribe", "audio/webm", "wo")]
 
 
+def test_language_is_optional(client: TestClient, voice: FakeVoiceClient) -> None:
+    assert client.post("/api/transcribe", files=AUDIO).status_code == 200
+    assert voice.calls == [("transcribe", "audio/webm", "auto")]
+
+
 def test_speak_returns_playable_audio(client: TestClient, voice: FakeVoiceClient) -> None:
     response = client.post("/api/speak", json={"text": "Waaw.", "language": "wo"})
     assert response.status_code == 200 and response.content == b"RIFF....WAVE"

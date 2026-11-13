@@ -46,8 +46,10 @@ class Transcript:
 
 class VoiceClient(Protocol):
     def transcribe(
-        self, audio: bytes, content_type: str, language: SpokenLanguage
-    ) -> Transcript: ...
+        self, audio: bytes, content_type: str, language: SpokenLanguage | None = None
+    ) -> Transcript:
+        """`language=None`: the speaker did not say which language; Scribe detects it."""
+        ...
 
     def synthesize(self, text: str, language: str) -> Speech: ...
 
@@ -65,24 +67,31 @@ class SpekoVoiceClient:
         self._speko = Speko(api_key=settings.speko_api_key.get_secret_value(), timeout=60)
         self._settings = settings
 
-    def transcribe(self, audio: bytes, content_type: str, language: SpokenLanguage) -> Transcript:
-        providers = self._settings.stt_providers.get(language, [])
+    def transcribe(
+        self, audio: bytes, content_type: str, language: SpokenLanguage | None = None
+    ) -> Transcript:
+        settings = self._settings
+        # Speko routes on a language; without one, route as Wolof (Scribe) and let the
+        # provider detect what was actually spoken.
+        routing = language or settings.auto_routing_language
+        stt_language = None if language else settings.auto_stt_language
         start = time.perf_counter()
         try:
             result = self._speko.transcribe(
                 audio,
-                language=language,
+                language=routing,
+                stt_language=stt_language,
                 content_type=content_type,
-                constraints=_only(providers),
+                constraints=_only(settings.stt_providers.get(routing, [])),
                 keywords=KEYWORDS,
             )
         except Exception as exc:  # SDK and network errors alike: the user sees one message
-            logger.error("transcribe(%s): %s: %s", language, type(exc).__name__, exc)
+            logger.error("transcribe(%s): %s: %s", routing, type(exc).__name__, exc)
             raise VoiceError("la transcription du vocal a échoué, réessayez") from exc
         ms = round((time.perf_counter() - start) * 1000)
         logger.info(
             "transcribe(%s): %s/%s %dms failovers=%d",
-            language,
+            language or f"auto via {routing}",
             result.provider,
             result.model,
             ms,

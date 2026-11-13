@@ -43,6 +43,10 @@ class Settings(BaseSettings):
         "fr": ["elevenlabs"],
         "en": ["elevenlabs"],
     }
+    # No language chosen in the app: route as this language (Scribe) and send this
+    # provider-facing language, which asks Scribe to detect the spoken language.
+    auto_routing_language: str = "wo"
+    auto_stt_language: str | None = "auto"
     tts_provider: str = "google"  # Speko's name for Gemini TTS
     tts_model: str | None = "gemini-3.8-flash-lite-tts"
     max_audio_bytes: int = 5_000_000  # about 5 minutes of Opus: far above one question

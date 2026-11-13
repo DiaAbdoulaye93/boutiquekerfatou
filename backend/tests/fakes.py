@@ -53,8 +53,10 @@ class FakeVoiceClient:
         self.fail_synthesize = False
         self.calls: list[tuple[str, ...]] = []
 
-    def transcribe(self, audio: bytes, content_type: str, language: str) -> Transcript:
-        self.calls.append(("transcribe", content_type, language))
+    def transcribe(
+        self, audio: bytes, content_type: str, language: str | None = None
+    ) -> Transcript:
+        self.calls.append(("transcribe", content_type, language or "auto"))
         if self.fail_transcribe:
             raise VoiceError("la transcription du vocal a échoué, réessayez")
         return Transcript(text=self.heard, provider="fake", duration_ms=300)

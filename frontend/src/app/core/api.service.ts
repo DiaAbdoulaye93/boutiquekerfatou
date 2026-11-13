@@ -16,7 +16,8 @@ export class ApiService {
     return this.http.post<AskOut>('/api/ask', body);
   }
 
-  transcribe(audio: Blob, language: SpokenLanguage): Observable<TranscribeOut> {
+  /** Without `language`, the spoken language is detected by the transcription. */
+  transcribe(audio: Blob, language?: SpokenLanguage): Observable<TranscribeOut> {
     const extension = audio.type.includes('mp4')
       ? 'm4a'
       : audio.type.includes('ogg')
@@ -24,7 +25,9 @@ export class ApiService {
         : 'webm';
     const form = new FormData();
     form.append('audio', audio, `question.${extension}`);
-    form.append('language', language);
+    if (language) {
+      form.append('language', language);
+    }
     return this.http.post<TranscribeOut>('/api/transcribe', form);
   }
 

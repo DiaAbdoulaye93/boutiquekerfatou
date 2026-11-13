@@ -8,11 +8,15 @@ import {
   viewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { SwUpdate } from '@angular/service-worker';
+import { filter } from 'rxjs';
 
 import { ApiService, errorMessage } from './core/api.service';
-import { formatDuration, formatValue, LANGUAGES } from './core/format';
-import { AskOut, Shop, SpokenLanguage, TurnIn } from './core/models';
+import { LANGUAGES } from './core/format';
+import { AskOut, TurnIn } from './core/models';
 import { Recorder } from './core/recorder';
+import { sounds } from './core/sounds';
+import { MicSpiral, MicState } from './shared/mic-spiral';
 import { ResultCard } from './shared/result-card';
 
 interface Message {
@@ -26,40 +30,15 @@ interface Message {
 // What the assistant is doing; each step shows on screen.
 type Status = 'idle' | 'recording' | 'transcribing' | 'thinking';
 const STATUS_LABELS: Record<Status, string> = {
-  idle: '',
-  recording: "J'écoute…",
+  idle: 'Touchez pour parler',
+  recording: "J'écoute… touchez pour envoyer",
   transcribing: 'Je transcris…',
   thinking: 'Je cherche dans la boutique…',
 };
 
-const SPOKEN: { code: SpokenLanguage; label: string }[] = [
-  { code: 'wo', label: 'Wolof' },
-  { code: 'fr', label: 'Français' },
-  { code: 'en', label: 'English' },
-];
-const LANGUAGE_KEY = 'boutique-vocale.langue';
-
-// Example questions, shown before the first question.
-const SUGGESTIONS = [
-  'Quel est le produit le plus acheté ce mois-ci ?',
-  'Ñaata la Modou Diop am bor ci man ?',
-  'Who owes me the most money?',
-  'Liste mes factures à crédit de la semaine',
-  "Qu'est-ce que je dois racheter ?",
-];
-
-function storedLanguage(): SpokenLanguage {
-  try {
-    const value = localStorage.getItem(LANGUAGE_KEY);
-    return value === 'fr' || value === 'en' || value === 'wo' ? value : 'wo';
-  } catch {
-    return 'wo';
-  }
-}
-
 @Component({
   selector: 'app-root',
-  imports: [FormsModule, ResultCard],
+  imports: [FormsModule, MicSpiral, ResultCard],
   templateUrl: './app.html',
 })
 export class App implements OnDestroy {
@@ -71,39 +50,49 @@ export class App implements OnDestroy {
   private tick: ReturnType<typeof setInterval> | null = null;
   private nextId = 1;
 
-  readonly shop = signal<Shop | null>(null);
+  readonly shopName = signal('Boutique vocale');
   readonly messages = signal<Message[]>([]);
   readonly status = signal<Status>('idle');
   readonly seconds = signal(0);
   readonly error = signal<string | null>(null);
   readonly draft = signal('');
-  readonly language = signal<SpokenLanguage>(storedLanguage());
+  readonly typing = signal(!Recorder.supported()); // keyboard instead of the mic
   readonly playing = signal<number | null>(null); // message id being read aloud
   readonly loadingVoice = signal<number | null>(null);
   readonly busy = computed(() => this.status() !== 'idle');
-  readonly statusLabel = computed(() => STATUS_LABELS[this.status()]);
+  readonly micState = computed<MicState>(() => {
+    const status = this.status();
+    return status === 'recording' ? 'recording' : status === 'idle' ? 'idle' : 'busy';
+  });
+  readonly statusLabel = computed(() => {
+    const status = this.status();
+    return status === 'recording'
+      ? `${STATUS_LABELS.recording} · ${this.seconds()} s`
+      : STATUS_LABELS[status];
+  });
   readonly micSupported = Recorder.supported();
-  readonly suggestions = SUGGESTIONS;
-  readonly spoken = SPOKEN;
   readonly languages = LANGUAGES;
 
   constructor() {
-    this.api.shop().subscribe({ next: (s) => this.shop.set(s) });
+    this.api.shop().subscribe({ next: (s) => this.shopName.set(s.name) });
+    // The service worker serves the cached app first; once it has fetched a newer
+    // deployment, switch to it right away instead of waiting for the next visit.
+    const updates = inject(SwUpdate);
+    if (updates.isEnabled) {
+      updates.versionUpdates
+        .pipe(filter((event) => event.type === 'VERSION_READY'))
+        .subscribe(() => {
+          if (this.status() === 'idle' && !this.messages().length) {
+            document.location.reload();
+          }
+        });
+    }
   }
 
   ngOnDestroy(): void {
     this.stopTick();
     this.player?.pause();
     this.audioUrls.forEach((url) => URL.revokeObjectURL(url));
-  }
-
-  setLanguage(code: SpokenLanguage): void {
-    this.language.set(code);
-    try {
-      localStorage.setItem(LANGUAGE_KEY, code);
-    } catch {
-      // private browsing: the choice just isn't remembered
-    }
   }
 
   send(text = this.draft()): void {
@@ -117,6 +106,7 @@ export class App implements OnDestroy {
 
   async toggleMic(): Promise<void> {
     if (this.status() === 'recording') {
+      sounds.stop();
       this.recorder.stop();
       return;
     }
@@ -132,6 +122,7 @@ export class App implements OnDestroy {
       this.error.set("Le micro n'est pas accessible. Autorisez-le dans le navigateur.");
       return;
     }
+    sounds.start();
     this.status.set('recording');
     this.seconds.set(0);
     this.tick = setInterval(() => this.seconds.update((s) => s + 1), 1000);
@@ -139,11 +130,12 @@ export class App implements OnDestroy {
     this.stopTick();
     if (audio.size < 1000) {
       this.status.set('idle');
-      this.error.set('Vocal trop court : appuyez, parlez, puis appuyez de nouveau.');
+      this.error.set('Vocal trop court : touchez, parlez, puis touchez de nouveau.');
       return;
     }
     this.status.set('transcribing');
-    this.api.transcribe(audio, this.language()).subscribe({
+    // No language sent: the transcription detects wolof, French or English by itself.
+    this.api.transcribe(audio).subscribe({
       next: (heard) => this.ask(heard.text, true),
       error: (err: unknown) => this.fail(err),
     });
@@ -182,15 +174,6 @@ export class App implements OnDestroy {
     this.error.set(null);
   }
 
-  meta(reply: AskOut): string {
-    const cost = reply.cost_usd === null ? '' : ` · ${formatValue('', reply.cost_usd)} $`;
-    return `${formatDuration(reply.duration_ms)} · ${reply.llm_calls} appels${cost}`;
-  }
-
-  period(shop: Shop): string {
-    return `${formatValue('', shop.first_day)} → ${formatValue('', shop.last_day)}`;
-  }
-
   private ask(question: string, spoken: boolean): void {
     const history: TurnIn[] = this.messages().map((m) => ({ role: m.role, text: m.text }));
     this.push({ role: 'user', text: question, spoken });
@@ -202,6 +185,8 @@ export class App implements OnDestroy {
         this.status.set('idle');
         if (spoken) {
           this.listen(message); // a spoken question gets a spoken answer
+        } else {
+          sounds.ready();
         }
       },
       error: (err: unknown) => this.fail(err),
