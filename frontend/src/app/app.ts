@@ -15,7 +15,7 @@ import { ApiService, errorMessage } from './core/api.service';
 import { LANGUAGES } from './core/format';
 import { AskOut, TurnIn } from './core/models';
 import { Recorder } from './core/recorder';
-import { sounds } from './core/sounds';
+import { Clip, playClip, sounds, unlockAudio } from './core/sounds';
 import { MicSpiral, MicState } from './shared/mic-spiral';
 import { ResultCard } from './shared/result-card';
 
@@ -45,8 +45,9 @@ export class App implements OnDestroy {
   private readonly api = inject(ApiService);
   private readonly recorder = inject(Recorder);
   private readonly bottom = viewChild<ElementRef<HTMLElement>>('bottom');
-  private readonly audioUrls = new Map<number, string>();
-  private player: HTMLAudioElement | null = null;
+  private readonly voices = new Map<number, Blob>(); // spoken answers, by message id
+  private clip: Clip | null = null;
+  private fallback: HTMLAudioElement | null = null;
   private tick: ReturnType<typeof setInterval> | null = null;
   private nextId = 1;
 
@@ -91,8 +92,7 @@ export class App implements OnDestroy {
 
   ngOnDestroy(): void {
     this.stopTick();
-    this.player?.pause();
-    this.audioUrls.forEach((url) => URL.revokeObjectURL(url));
+    this.stopVoice();
   }
 
   send(text = this.draft()): void {
@@ -100,11 +100,14 @@ export class App implements OnDestroy {
     if (!question || this.busy()) {
       return;
     }
+    unlockAudio(); // inside the tap: lets the answer be read aloud by itself
     this.draft.set('');
-    this.ask(question, false);
+    this.ask(question);
   }
 
   async toggleMic(): Promise<void> {
+    // Must run synchronously in the tap, before any await (iOS is strict about it).
+    unlockAudio();
     if (this.status() === 'recording') {
       sounds.stop();
       this.recorder.stop();
@@ -114,7 +117,7 @@ export class App implements OnDestroy {
       return;
     }
     this.error.set(null);
-    this.player?.pause();
+    this.stopVoice();
     let recording: Promise<Blob>;
     try {
       recording = (await this.recorder.start()).done;
@@ -143,9 +146,9 @@ export class App implements OnDestroy {
 
   /** Reads an answer aloud, fetching its audio the first time. */
   listen(message: Message): void {
-    const url = this.audioUrls.get(message.id);
-    if (url) {
-      this.play(message.id, url);
+    const voice = this.voices.get(message.id);
+    if (voice) {
+      void this.play(message.id, voice);
       return;
     }
     if (!message.reply || this.loadingVoice() !== null) {
@@ -155,9 +158,8 @@ export class App implements OnDestroy {
     this.api.speak(message.reply.answer, message.reply.language).subscribe({
       next: (blob) => {
         this.loadingVoice.set(null);
-        const fresh = URL.createObjectURL(blob);
-        this.audioUrls.set(message.id, fresh);
-        this.play(message.id, fresh);
+        this.voices.set(message.id, blob);
+        void this.play(message.id, blob);
       },
       error: () => {
         this.loadingVoice.set(null);
@@ -167,14 +169,13 @@ export class App implements OnDestroy {
   }
 
   reset(): void {
-    this.player?.pause();
-    this.audioUrls.forEach((url) => URL.revokeObjectURL(url));
-    this.audioUrls.clear();
+    this.stopVoice();
+    this.voices.clear();
     this.messages.set([]);
     this.error.set(null);
   }
 
-  private ask(question: string, spoken: boolean): void {
+  private ask(question: string, spoken = false): void {
     const history: TurnIn[] = this.messages().map((m) => ({ role: m.role, text: m.text }));
     this.push({ role: 'user', text: question, spoken });
     this.status.set('thinking');
@@ -183,11 +184,7 @@ export class App implements OnDestroy {
       next: (reply) => {
         const message = this.push({ role: 'assistant', text: reply.answer, reply });
         this.status.set('idle');
-        if (spoken) {
-          this.listen(message); // a spoken question gets a spoken answer
-        } else {
-          sounds.ready();
-        }
+        this.listen(message); // every answer is read aloud
       },
       error: (err: unknown) => this.fail(err),
     });
@@ -198,14 +195,37 @@ export class App implements OnDestroy {
     this.status.set('idle');
   }
 
-  private play(id: number, url: string): void {
-    this.player?.pause();
-    const player = new Audio(url);
-    this.player = player;
+  private async play(id: number, voice: Blob): Promise<void> {
+    this.stopVoice();
     this.playing.set(id);
-    player.onended = () => this.playing.set(null);
-    // Some browsers block playback that does not follow a tap: the button stays.
-    player.play().catch(() => this.playing.set(null));
+    try {
+      // Through the audio context unlocked by the last tap: plays without a new tap.
+      const clip = await playClip(voice);
+      this.clip = clip;
+      await clip.ended;
+      if (this.clip === clip) {
+        this.clip = null;
+        this.playing.set(null);
+      }
+    } catch {
+      // No Web Audio or undecodable audio: a plain audio element (may need a tap).
+      const url = URL.createObjectURL(voice);
+      const player = new Audio(url);
+      this.fallback = player;
+      player.onended = () => {
+        URL.revokeObjectURL(url);
+        this.playing.set(null);
+      };
+      player.play().catch(() => this.playing.set(null));
+    }
+  }
+
+  private stopVoice(): void {
+    this.clip?.stop();
+    this.clip = null;
+    this.fallback?.pause();
+    this.fallback = null;
+    this.playing.set(null);
   }
 
   private push(message: Omit<Message, 'id'>): Message {

@@ -26,6 +26,8 @@ class Settings(BaseSettings):
     assistant_model: str = "claude-opus-5-5"
     assistant_effort: Effort = "low"
     assistant_max_tokens: int = 8000
+    # Opus 5.5 fast mode: up to 2.5x faster output, 2x the token price (8/40 $ per M).
+    assistant_fast_mode: bool = True
     # Upper bound on model <-> tools round trips for one question.
     assistant_max_steps: int = 6
     # Previous turns sent back for follow-up questions ("et le mois dernier ?").

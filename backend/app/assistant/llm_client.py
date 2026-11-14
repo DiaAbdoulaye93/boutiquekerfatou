@@ -16,6 +16,8 @@ from app.config import Effort, ModelPricing, Settings
 logger = logging.getLogger(__name__)
 
 SERVER_FALLBACK_BETA = "server-side-fallback-2026-07-01"
+# Models served faster with `speed: "fast"` (no beta flag), at twice the token price.
+FAST_MODE_MODELS = frozenset({"claude-opus-5-5"})
 
 
 class LlmError(RuntimeError):
@@ -112,14 +114,19 @@ class AnthropicLlmClient:
             "tool_choice": {"type": "auto"},
             "output_config": {"effort": effort},
         }
+        if self._settings.assistant_fast_mode and model in FAST_MODE_MODELS:
+            params["speed"] = "fast"
         start = time.perf_counter()
         try:
-            if model in self._settings.server_fallback_models:
-                response = self._client.beta.messages.create(
-                    betas=[SERVER_FALLBACK_BETA], fallbacks="default", **params
-                )
-            else:
-                response = self._client.messages.create(**params)
+            try:
+                response = self._send(model, params)
+            except anthropic.RateLimitError:
+                # Fast mode has its own rate limit: fall back to standard speed once.
+                if "speed" not in params:
+                    raise
+                logger.warning("%s: fast mode rate-limited, retrying at standard speed", step)
+                params.pop("speed")
+                response = self._send(model, params)
         except anthropic.APIStatusError as exc:
             logger.error("%s: API error %d: %s", step, exc.status_code, exc.message)
             raise LlmError(_status_message(exc.status_code)) from exc
@@ -136,6 +143,13 @@ class AnthropicLlmClient:
             logger.error("%s: response hit max_tokens=%d", step, max_tokens)
             raise LlmError(TRUNCATED_MESSAGE)
         return response
+
+    def _send(self, model: str, params: dict[str, Any]) -> Any:
+        if model in self._settings.server_fallback_models:
+            return self._client.beta.messages.create(
+                betas=[SERVER_FALLBACK_BETA], fallbacks="default", **params
+            )
+        return self._client.messages.create(**params)
 
     def _record(self, step: str, response: Any, duration_ms: int) -> None:
         usage = response.usage

@@ -37,6 +37,44 @@ function play(notes: Note[], volume = 0.18, type: OscillatorType = 'sine'): void
   }
 }
 
+/**
+ * A clip playing through the shared audio context. Mobile browsers only let a page make
+ * sound right after a tap; the context is unlocked when the mic is touched (the start
+ * sound), so the spoken answer, which arrives seconds later, can still play by itself.
+ */
+export interface Clip {
+  ended: Promise<void>;
+  stop(): void;
+}
+
+export async function playClip(audioData: Blob): Promise<Clip> {
+  const ctx = audio();
+  if (!ctx) {
+    throw new Error('Web Audio unavailable');
+  }
+  const buffer = await ctx.decodeAudioData(await audioData.arrayBuffer());
+  const source = ctx.createBufferSource();
+  source.buffer = buffer;
+  source.connect(ctx.destination);
+  const ended = new Promise<void>((resolve) => (source.onended = () => resolve()));
+  source.start();
+  return {
+    ended,
+    stop: () => {
+      try {
+        source.stop();
+      } catch {
+        // already stopped
+      }
+    },
+  };
+}
+
+/** Call from a tap handler: resumes the audio context so later sounds may play. */
+export function unlockAudio(): void {
+  audio();
+}
+
 export const sounds = {
   /** Mic opens: two rising notes. */
   start: () =>
